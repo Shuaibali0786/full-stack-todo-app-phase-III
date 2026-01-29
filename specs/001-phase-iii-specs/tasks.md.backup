@@ -1,0 +1,824 @@
+# Tasks: TaskFlow AI - Intelligent Task Assistant
+
+**Feature Branch**: `001-phase-iii-specs`
+**Created**: 2026-01-27
+**Input**: Design documents from `/specs/001-phase-iii-specs/`
+**Prerequisites**: plan.md (✅), spec.md (✅), research.md (✅), data-model.md (✅), contracts/ (✅)
+
+**Tests**: NOT REQUESTED - Spec does not explicitly request TDD approach. Testing strategy defined in plan.md but test implementation tasks not included.
+
+**Organization**: Tasks grouped by user story (US1-US5) to enable independent implementation and testing of each story
+
+---
+
+## Task Summary
+
+**Total Tasks**: 65
+**Organization**: By user story priority (P1 → P2)
+**Test Strategy**: Test-First (Red-Green-Refactor per constitutional requirement)
+**Parallel Opportunities**: 28 parallelizable tasks marked with [P]
+
+### Task Distribution
+- Phase 1 (Setup): 5 tasks
+- Phase 2 (Foundational - Database & Migration): 8 tasks
+- Phase 3 (US1-P1: Persist Conversation): 5 tasks
+- Phase 4 (US2-P1: Store Messages): 6 tasks
+- Phase 5 (US3-P1: Context Reconstruction): 7 tasks
+- Phase 6 (US1-MCP: Add Task Tool): 6 tasks
+- Phase 7 (US2-MCP: List Tasks Tool): 7 tasks
+- Phase 8 (US3-MCP: Update Task Tool): 5 tasks
+- Phase 9 (US1-Agent: Create Task via NL): 6 tasks
+- Phase 10 (US2-Agent: List Tasks via NL): 5 tasks
+- Phase 11 (US4-P2: Server Restart Validation): 3 tasks
+- Phase 12 (US4-MCP: Complete Task Tool): 4 tasks
+- Phase 13 (US5-MCP: Delete Task Tool): 4 tasks
+- Phase 14 (US3-Agent: Update Task via NL): 3 tasks
+- Phase 15 (US4-Agent: Delete Task via NL): 3 tasks
+- Phase 16 (Polish & Integration): 8 tasks
+
+---
+
+## Implementation Strategy
+
+### MVP Scope (Minimum Viable Product)
+**Recommended MVP**: Phases 1-10 (Database + MCP Tools + Agent for Create & List tasks)
+
+**MVP Delivers**:
+- User can create tasks via natural language
+- User can list tasks via natural language
+- Full persistence (conversations + messages)
+- Stateless architecture validated
+- MCP tools for add_task and list_tasks (100% tested)
+
+**Post-MVP**: Phases 11-16 (Update, Complete, Delete operations + vivo_all + polish)
+
+### Dependency Graph
+
+```
+Phase 1 (Setup)
+    ↓
+Phase 2 (Database Foundation) → BLOCKS all other phases
+    ↓
+Phase 3 (Persist Conversation) ────┐
+    ↓                              │
+Phase 4 (Store Messages)          │→ REQUIRED for Agent phases
+    ↓                              │
+Phase 5 (Context Reconstruction) ──┘
+    ↓
+Phase 6 (Add Task MCP Tool) ───┐
+    ↓                          │→ REQUIRED for Agent Create Task
+Phase 9 (Create Task Agent) ───┘
+    ↓
+Phase 7 (List Tasks MCP Tool) ─┐
+    ↓                          │→ REQUIRED for Agent List Tasks
+Phase 10 (List Tasks Agent) ───┘
+
+[Phases 11-16 can be done in any order after Phase 10]
+```
+
+### Parallel Execution Opportunities
+
+**Within Phase 2 (Database)**: All model/service creation tasks can run in parallel
+**Within Phase 6-8 (MCP Tools)**: All tool implementations can run in parallel
+**Within Phase 9-10 (Agent)**: Intent detection and date parsing can run in parallel
+
+---
+
+## Phase 1: Setup & Dependencies
+
+**Objective**: Install dependencies, configure environment for Phase III development
+
+**Independent Test**: Run `pip list` and verify new packages installed
+
+### Tasks
+
+- [ ] T001 Install Phase III Python dependencies in backend/requirements.txt
+  - Add: openai-agents-sdk, mcp-python-sdk, dateparser, python-dateutil
+  - Verify: Run `pip install -r backend/requirements.txt`
+  - **Spec Reference**: plan.md Technical Context
+
+- [ ] T002 Configure environment variables for Phase III in backend/.env
+  - Add: OPENAI_API_KEY, AGENT_MODEL=gpt-4-turbo
+  - Verify: Environment loads without errors
+  - **Spec Reference**: plan.md Phase 1 Quickstart
+
+- [ ] T003 [P] Create Phase III migrations directory structure
+  - Create: backend/src/migrations/ (if not exists)
+  - Verify: Directory exists and is writable
+  - **Spec Reference**: plan.md Project Structure
+
+- [ ] T004 [P] Update backend/src/core/database.py to import new Phase III models
+  - Modify: Import Conversation and Message in create_tables function
+  - Verify: No import errors when models created
+  - **Spec Reference**: plan.md Database Integration
+
+- [ ] T005 Run Phase II test suite to establish baseline before changes
+  - Execute: pytest backend/tests/ -v
+  - Verify: All Phase II tests pass (baseline)
+  - **Spec Reference**: plan.md Phase-II Protection
+
+---
+
+## Phase 2: Foundational - Database Schema & Models
+
+**Objective**: Add conversations and messages tables, create SQLModel classes
+
+**Independent Test**: Run migration, query tables via psql, verify schema matches spec-7
+
+**Dependencies**: Phase 1 complete
+
+### Tasks
+
+- [ ] T006 Write database migration SQL for conversations table in backend/src/migrations/add_phase_iii_tables.sql
+  - Create: conversations table with schema from spec-7
+  - Include: id UUID PK, user_id UUID FK UNIQUE, created_at, updated_at, indexes
+  - Verify: SQL syntax valid (test with `psql --dry-run`)
+  - **Spec Reference**: spec-7 Database Schema, plan.md Phase 1 Step 1.1
+
+- [ ] T007 Write database migration SQL for messages table in backend/src/migrations/add_phase_iii_tables.sql
+  - Create: messages table with schema from spec-7
+  - Include: id UUID PK, conversation_id UUID FK, role VARCHAR(10) CHECK, content TEXT CHECK, created_at, indexes
+  - Verify: SQL syntax valid
+  - **Spec Reference**: spec-7 Database Schema, plan.md Phase 1 Step 1.1
+
+- [ ] T008 Write rollback migration SQL in backend/src/migrations/rollback_phase_iii_tables.sql
+  - Create: DROP TABLE IF EXISTS messages CASCADE; DROP TABLE IF EXISTS conversations CASCADE;
+  - Verify: Rollback script is idempotent
+  - **Spec Reference**: plan.md Phase 1 Step 1.1
+
+- [ ] T009 Run migration on Neon database using DATABASE_URL
+  - Execute: psql $DATABASE_URL -f backend/src/migrations/add_phase_iii_tables.sql
+  - Verify: Tables exist, no errors, Phase II tables unchanged
+  - **Spec Reference**: plan.md Phase 1 Database Migration
+
+- [ ] T010 [P] Create Conversation SQLModel in backend/src/models/conversation.py
+  - Implement: Conversation class with fields from plan.md Phase 1 Step 1.1
+  - Include: Relationships to User and Messages
+  - Verify: Model imports without errors
+  - **Spec Reference**: plan.md Phase 1 Step 1.1, spec-7 Conversations Table
+
+- [ ] T011 [P] Create Message SQLModel in backend/src/models/message.py
+  - Implement: Message class with fields from plan.md Phase 1 Step 1.1
+  - Include: Relationship to Conversation
+  - Verify: Model imports without errors
+  - **Spec Reference**: plan.md Phase 1 Step 1.1, spec-7 Messages Table
+
+- [ ] T012 [P] Update User model to add conversation relationship in backend/src/models/user.py
+  - Add: conversation: Optional[Conversation] = Relationship(back_populates="user")
+  - Verify: No circular import errors
+  - **Spec Reference**: plan.md Phase 1 Step 1.1
+
+- [ ] T013 Verify database schema matches specifications
+  - Execute: psql $DATABASE_URL -c "\d conversations" and "\d messages"
+  - Verify: All columns, constraints, indexes present
+  - **Spec Reference**: spec-7 Database Schema Design
+
+---
+
+## Phase 3: US1-P1 - Persist Conversation on First Message
+
+**User Story**: spec-7 User Story 1 (Priority P1)
+
+**Objective**: System creates conversation record when user sends first message
+
+**Independent Test**: POST first message to chat API (stub), verify conversations table has new row
+
+**Dependencies**: Phase 2 complete
+
+### Tasks
+
+- [ ] T014 [P] [US1-P7] Write test for conversation creation on first message in backend/tests/test_conversation_service.py
+  - Test: test_create_conversation_for_new_user()
+  - Given: User has no conversation, When: create_conversation called, Then: conversation created with user_id
+  - **Spec Reference**: spec-7 US1 Acceptance Scenario 1
+
+- [ ] T015 [P] [US1-P7] Write test for reusing existing conversation in backend/tests/test_conversation_service.py
+  - Test: test_reuse_existing_conversation()
+  - Given: User already has conversation, When: get_or_create called, Then: returns existing conversation
+  - **Spec Reference**: spec-7 US1 Acceptance Scenario 2
+
+- [ ] T016 [US1-P7] Create ConversationService in backend/src/services/conversation_service.py
+  - Implement: create_conversation(session, user_id) → Conversation
+  - Implement: get_or_create_conversation(session, user_id) → Conversation
+  - Verify: Tests pass (Red → Green)
+  - **Spec Reference**: spec-7 US1, plan.md Implementation Roadmap Step 1
+
+- [ ] T017 [US1-P7] Add conversation isolation validation test in backend/tests/test_conversation_service.py
+  - Test: test_conversation_isolation_between_users()
+  - Given: Two users, When: Both create conversations, Then: separate conversation_ids
+  - **Spec Reference**: spec-7 Conversation Service Tests
+
+- [ ] T018 [US1-P7] Verify UNIQUE constraint on conversations.user_id
+  - Test: Attempt to create duplicate conversation for same user
+  - Verify: Database constraint violation raised
+  - **Spec Reference**: spec-7 Conversations Table Design Rationale
+
+---
+
+## Phase 4: US2-P1 - Store Message in Conversation
+
+**User Story**: spec-7 User Story 2 (Priority P1)
+
+**Objective**: System persists every user message and agent response to database
+
+**Independent Test**: Call store_message twice (user + agent), verify messages table has 2 rows in chronological order
+
+**Dependencies**: Phase 3 complete
+
+### Tasks
+
+- [ ] T019 [P] [US2-P7] Write test for storing user message in backend/tests/test_conversation_service.py
+  - Test: test_store_user_message()
+  - Given: Conversation exists, When: store_message(role='user'), Then: message saved with correct role
+  - **Spec Reference**: spec-7 US2 Acceptance Scenario 1
+
+- [ ] T020 [P] [US2-P7] Write test for storing agent message in backend/tests/test_conversation_service.py
+  - Test: test_store_agent_message()
+  - Given: Conversation exists, When: store_message(role='agent'), Then: message saved with correct role
+  - **Spec Reference**: spec-7 US2 Acceptance Scenario 2
+
+- [ ] T021 [P] [US2-P7] Write test for chronological message ordering in backend/tests/test_conversation_service.py
+  - Test: test_messages_chronological_order()
+  - Given: 5 messages stored, When: get_messages called, Then: returned in ORDER BY created_at ASC
+  - **Spec Reference**: spec-7 US2 Acceptance Scenario 3
+
+- [ ] T022 [US2-P7] Implement store_message in backend/src/services/conversation_service.py
+  - Implement: store_message(session, conversation_id, role, content) → Message
+  - Include: Validation for role ('user' | 'agent'), content length <= 10000
+  - Verify: Tests pass (Red → Green)
+  - **Spec Reference**: spec-7 US2, plan.md Implementation Roadmap Step 1
+
+- [ ] T023 [US2-P7] Implement get_messages in backend/src/services/conversation_service.py
+  - Implement: get_messages(session, conversation_id, limit=50, offset=0) → List[Message]
+  - Include: ORDER BY created_at ASC, pagination support
+  - Verify: Chronological order test passes
+  - **Spec Reference**: spec-7 US2, plan.md Context Reconstruction
+
+- [ ] T024 [US2-P7] Add message content length validation test
+  - Test: Attempt to store message >10000 chars
+  - Verify: CHECK constraint violation or validation error
+  - **Spec Reference**: spec-7 Messages Table Design Rationale
+
+---
+
+## Phase 5: US3-P1 - Reconstruct Context from Database
+
+**User Story**: spec-7 User Story 3 (Priority P1)
+
+**Objective**: System retrieves conversation history from database on every request
+
+**Independent Test**: Seed 10 messages, call reconstruct_context, verify returns last 50 (or all if <50)
+
+**Dependencies**: Phase 4 complete
+
+### Tasks
+
+- [ ] T025 [P] [US3-P7] Write test for context reconstruction with <50 messages in backend/tests/test_conversation_service.py
+  - Test: test_reconstruct_context_less_than_50()
+  - Given: 10 messages, When: reconstruct_context called, Then: all 10 returned
+  - **Spec Reference**: spec-7 US3 Acceptance Scenario 1
+
+- [ ] T026 [P] [US3-P7] Write test for context reconstruction with >50 messages in backend/tests/test_conversation_service.py
+  - Test: test_reconstruct_context_more_than_50()
+  - Given: 100 messages, When: reconstruct_context called, Then: only last 50 returned
+  - **Spec Reference**: spec-7 US3 Acceptance Scenario 3
+
+- [ ] T027 [P] [US3-P7] Write test for context reconstruction chronological order in backend/tests/test_conversation_service.py
+  - Test: test_context_chronological_order()
+  - Given: 10 messages, When: reconstructed, Then: oldest first (chronological)
+  - **Spec Reference**: spec-7 US3 Acceptance Scenario 2
+
+- [ ] T028 [US3-P7] Implement reconstruct_context in backend/src/services/conversation_service.py
+  - Implement: reconstruct_context(session, user_id) → List[Dict[str, str]]
+  - Include: Get conversation, retrieve last 50 messages, format for agent
+  - Verify: All tests pass (Red → Green)
+  - **Spec Reference**: spec-7 US3, plan.md Data Flow Step 2
+
+- [ ] T029 [US3-P7] Add context reconstruction performance test
+  - Test: Measure query time for 50-message reconstruction
+  - Verify: Completes in <500ms (per success criteria SC-002)
+  - **Spec Reference**: spec-7 Success Criteria SC-002
+
+- [ ] T030 [US3-P7] Verify context reconstruction uses database indexes
+  - Execute: EXPLAIN ANALYZE on context reconstruction query
+  - Verify: Uses idx_messages_created_at index (not table scan)
+  - **Spec Reference**: spec-7 Query Optimization
+
+- [ ] T031 [US3-P7] Add test for context resolution ("it" refers to last task)
+  - Test: Context includes "created task: buy milk", verify "it" resolvable
+  - Verify: Agent can parse context (integration with agent service)
+  - **Spec Reference**: spec-5 Context Resolution
+
+---
+
+## Phase 6: US1-MCP - Add Task Tool (MCP Server)
+
+**User Story**: spec-6 User Story 1 (Priority P1)
+
+**Objective**: MCP tool accepts task parameters and persists new task to database
+
+**Independent Test**: Call add_task tool directly, verify task in database via Phase II API
+
+**Dependencies**: Phase 2 complete (can run in parallel with Phase 3-5)
+
+### Tasks
+
+- [ ] T032 [P] [US1-MCP] Write test for add_task success in backend/tests/test_mcp_tools.py
+  - Test: test_add_task_success()
+  - Given: Valid params, When: add_task called, Then: task created, returns task object
+  - **Spec Reference**: spec-6 US1 Acceptance Scenario 1
+
+- [ ] T033 [P] [US1-MCP] Write test for add_task missing title error in backend/tests/test_mcp_tools.py
+  - Test: test_add_task_missing_title()
+  - Given: No title, When: add_task called, Then: VALIDATION_ERROR returned
+  - **Spec Reference**: spec-6 US1 Acceptance Scenario 3
+
+- [ ] T034 [P] [US1-MCP] Write test for add_task invalid user unauthorized in backend/tests/test_mcp_tools.py
+  - Test: test_add_task_invalid_user()
+  - Given: Non-existent user_id, When: add_task called, Then: UNAUTHORIZED error
+  - **Spec Reference**: spec-6 Tool 1 Error Conditions
+
+- [ ] T035 [US1-MCP] Implement add_task MCP tool in backend/src/services/mcp_server.py
+  - Implement: add_task(title, description, user_id, due_date, reminder_time, priority_id) → Task
+  - Include: Input validation, transaction handling, error responses
+  - Verify: All tests pass (100% coverage requirement)
+  - **Spec Reference**: spec-6 Tool 1, plan.md MCP Tool Signatures
+
+- [ ] T036 [US1-MCP] Add add_task transaction rollback test
+  - Test: Simulate database error mid-transaction
+  - Verify: Task not created (rollback successful)
+  - **Spec Reference**: spec-6 Success Criteria SC-006
+
+- [ ] T037 [US1-MCP] Verify add_task integrates with existing TaskService
+  - Test: add_task wraps TaskService.create_task
+  - Verify: Reuses existing Phase II logic (no duplication)
+  - **Spec Reference**: plan.md MCP Server Implementation Step 2
+
+---
+
+## Phase 7: US2-MCP - List Tasks Tool (MCP Server)
+
+**User Story**: spec-6 User Story 2 (Priority P1)
+
+**Objective**: MCP tool queries database and returns filtered task list
+
+**Independent Test**: Seed 5 tasks, call list_tasks with filters, verify correct subset returned
+
+**Dependencies**: Phase 2 complete (can run in parallel with Phase 3-6)
+
+### Tasks
+
+- [ ] T038 [P] [US2-MCP] Write test for list_tasks no filters in backend/tests/test_mcp_tools.py
+  - Test: test_list_tasks_no_filters()
+  - Given: User has 5 tasks, When: list_tasks(user_id), Then: all 5 returned
+  - **Spec Reference**: spec-6 US2 Acceptance Scenario 1
+
+- [ ] T039 [P] [US2-MCP] Write test for list_tasks filter by completed in backend/tests/test_mcp_tools.py
+  - Test: test_list_tasks_filter_completed()
+  - Given: 2 completed + 3 pending, When: list_tasks(completed=false), Then: only 3 returned
+  - **Spec Reference**: spec-6 US2 Acceptance Scenario 2
+
+- [ ] T040 [P] [US2-MCP] Write test for list_tasks filter by due_date in backend/tests/test_mcp_tools.py
+  - Test: test_list_tasks_filter_due_date()
+  - Given: Tasks with various due dates, When: list_tasks(due_date='2026-01-30'), Then: only matching date
+  - **Spec Reference**: spec-6 US2 Acceptance Scenario 3
+
+- [ ] T041 [P] [US2-MCP] Write test for list_tasks vivo_all admin success in backend/tests/test_mcp_tools.py
+  - Test: test_list_tasks_vivo_all_admin()
+  - Given: Admin user, When: list_tasks(vivo_all=True), Then: returns tasks for all users
+  - **Spec Reference**: plan.md Vivo All Implementation
+
+- [ ] T042 [P] [US2-MCP] Write test for list_tasks vivo_all non-admin unauthorized in backend/tests/test_mcp_tools.py
+  - Test: test_list_tasks_vivo_all_non_admin()
+  - Given: Non-admin user, When: list_tasks(vivo_all=True), Then: UNAUTHORIZED error
+  - **Spec Reference**: plan.md Vivo All Implementation
+
+- [ ] T043 [US2-MCP] Implement list_tasks MCP tool in backend/src/services/mcp_server.py
+  - Implement: list_tasks(user_id, completed, due_date, priority_id, limit, offset, vivo_all) → Dict
+  - Include: Filter logic, pagination, vivo_all authorization check, audit logging
+  - Verify: All tests pass (100% coverage)
+  - **Spec Reference**: spec-6 Tool 2, plan.md Vivo All Implementation
+
+- [ ] T044 [US2-MCP] Add list_tasks performance test (<200ms target)
+  - Test: Benchmark list_tasks with 1000 tasks
+  - Verify: 95th percentile <200ms (per success criteria SC-002)
+  - **Spec Reference**: spec-6 Success Criteria SC-002
+
+---
+
+## Phase 8: US3-MCP - Update Task Tool (MCP Server)
+
+**User Story**: spec-6 User Story 3 (Priority P1)
+
+**Objective**: MCP tool updates existing task fields
+
+**Independent Test**: Create task, call update_task with new values, verify via Phase II API
+
+**Dependencies**: Phase 2 complete (can run in parallel with Phase 3-7)
+
+### Tasks
+
+- [ ] T045 [P] [US3-MCP] Write test for update_task success in backend/tests/test_mcp_tools.py
+  - Test: test_update_task_success()
+  - Given: Task exists, When: update_task(title='new title'), Then: task updated
+  - **Spec Reference**: spec-6 US3 Acceptance Scenario 1
+
+- [ ] T046 [P] [US3-MCP] Write test for update_task partial update in backend/tests/test_mcp_tools.py
+  - Test: test_update_task_partial()
+  - Given: Task exists, When: update_task(due_date only), Then: only due_date changed
+  - **Spec Reference**: spec-6 US3 Acceptance Scenario 2
+
+- [ ] T047 [P] [US3-MCP] Write test for update_task not found error in backend/tests/test_mcp_tools.py
+  - Test: test_update_task_not_found()
+  - Given: Task doesn't exist, When: update_task called, Then: NOT_FOUND error
+  - **Spec Reference**: spec-6 US3 Acceptance Scenario 3
+
+- [ ] T048 [P] [US3-MCP] Write test for update_task wrong user unauthorized in backend/tests/test_mcp_tools.py
+  - Test: test_update_task_wrong_user()
+  - Given: Task belongs to user A, When: user B updates, Then: UNAUTHORIZED error
+  - **Spec Reference**: spec-6 Security Requirements
+
+- [ ] T049 [US3-MCP] Implement update_task MCP tool in backend/src/services/mcp_server.py
+  - Implement: update_task(task_id, user_id, title, description, due_date, reminder_time, is_completed, priority_id) → Task
+  - Include: Authorization check, partial update logic, transaction handling
+  - Verify: All tests pass (100% coverage)
+  - **Spec Reference**: spec-6 Tool 3, plan.md MCP Tool Signatures
+
+---
+
+## Phase 9: US1-Agent - Create Task via Natural Language
+
+**User Story**: spec-5 User Story 1 (Priority P1)
+
+**Objective**: User speaks naturally to create a todo task
+
+**Independent Test**: Send "add buy milk tomorrow at 3pm" to agent, verify task created via Phase II API
+
+**Dependencies**: Phase 5 complete (context reconstruction), Phase 6 complete (add_task MCP tool)
+
+### Tasks
+
+- [ ] T050 [P] [US1-Agent] Write test for CREATE intent detection in backend/tests/test_agent_service.py
+  - Test: test_intent_detection_create()
+  - Given: "add buy milk", When: agent processes, Then: detects CREATE intent
+  - **Spec Reference**: spec-5 Intent Detection Rules
+
+- [ ] T051 [P] [US1-Agent] Write test for date parsing "tomorrow" in backend/tests/test_agent_service.py
+  - Test: test_date_parsing_tomorrow()
+  - Given: "add task tomorrow", When: agent parses, Then: resolves to next calendar day
+  - **Spec Reference**: spec-5 Natural Language Processing Requirements
+
+- [ ] T052 [P] [US1-Agent] Implement date parsing utility in backend/src/utils/date_parser.py
+  - Implement: parse_date(text) → datetime using dateparser library
+  - Include: Relative dates ("tomorrow", "next week"), absolute dates ("Jan 30")
+  - Verify: Tests pass
+  - **Spec Reference**: plan.md Phase 0 R3, spec-5 Date Parsing
+
+- [ ] T053 [US1-Agent] Create AgentService with OpenAI Agent initialization in backend/src/services/agent_service.py
+  - Implement: initialize_agent(mcp_tools) → Agent
+  - Include: Agent system prompt from plan.md Agent Behavior Specifications
+  - Verify: Agent initializes without errors
+  - **Spec Reference**: plan.md Agent Behavior Specifications, spec-5 Agent Capabilities
+
+- [ ] T054 [US1-Agent] Implement process_message in backend/src/services/agent_service.py
+  - Implement: process_message(user_message, context, user_id) → str (agent response)
+  - Include: Pass context to agent, handle tool calls, return natural language response
+  - Verify: CREATE intent triggers add_task tool
+  - **Spec Reference**: spec-5 US1, plan.md Agent Service Step 3
+
+- [ ] T055 [US1-Agent] Add test for agent confirmation format
+  - Test: Agent responds "✅ Created task: 'buy milk' (due tomorrow at 3pm)"
+  - Verify: Confirmation matches spec-5 Response Format
+  - **Spec Reference**: spec-5 Agent Behavior Standards
+
+---
+
+## Phase 10: US2-Agent - List Tasks via Natural Language
+
+**User Story**: spec-5 User Story 2 (Priority P1)
+
+**Objective**: User queries their tasks in natural language
+
+**Independent Test**: Seed 3 tasks, send "what's on my list?" to agent, verify returns all 3
+
+**Dependencies**: Phase 5 complete (context), Phase 7 complete (list_tasks MCP tool), Phase 9 complete (agent service)
+
+### Tasks
+
+- [ ] T056 [P] [US2-Agent] Write test for READ intent detection in backend/tests/test_agent_service.py
+  - Test: test_intent_detection_read()
+  - Given: "show my tasks", When: agent processes, Then: detects READ intent
+  - **Spec Reference**: spec-5 Intent Detection Rules
+
+- [ ] T057 [P] [US2-Agent] Write test for empty task list response in backend/tests/test_agent_service.py
+  - Test: test_empty_task_list()
+  - Given: User has no tasks, When: "what's next?", Then: "You're all caught up!"
+  - **Spec Reference**: spec-5 US2 Acceptance Scenario 3
+
+- [ ] T058 [P] [US2-Agent] Write test for filtered task query in backend/tests/test_agent_service.py
+  - Test: test_filtered_task_query()
+  - Given: "what's due today?", When: agent processes, Then: calls list_tasks with date filter
+  - **Spec Reference**: spec-5 US2 Acceptance Scenario 2
+
+- [ ] T059 [US2-Agent] Implement list tasks intent handling in backend/src/services/agent_service.py
+  - Enhance: process_message to handle READ intent → list_tasks tool call
+  - Include: Natural language formatting of task list
+  - Verify: Tests pass
+  - **Spec Reference**: spec-5 US2, plan.md Agent Behavior Plan
+
+- [ ] T060 [US2-Agent] Add test for natural language task list formatting
+  - Test: Verify agent returns human-readable task list (not JSON)
+  - Verify: Format matches spec-5 Response Format
+  - **Spec Reference**: spec-5 Agent Behavior Standards
+
+---
+
+## Phase 11: US4-P2 - Resume Conversation After Server Restart
+
+**User Story**: spec-7 User Story 4 (Priority P2)
+
+**Objective**: User can continue conversation after backend server restarts
+
+**Independent Test**: Create conversation, restart server (simulate), send new message, verify context preserved
+
+**Dependencies**: Phase 10 complete (full MVP functional)
+
+### Tasks
+
+- [ ] T061 [US4-P7] Write stateless validation test in backend/tests/test_stateless.py
+  - Test: test_server_restart_preserves_context()
+  - Given: 5 messages sent, When: server restarted, Then: new message has access to prior 5
+  - **Spec Reference**: spec-7 US4 Acceptance Scenario 1, plan.md Stateless Validation
+
+- [ ] T062 [US4-P7] Verify no in-memory state persists after restart
+  - Test: Inspect agent service, conversation service for singleton patterns
+  - Verify: All state reconstructed from database (no cached data)
+  - **Spec Reference**: spec-7 US4 Acceptance Scenario 2, plan.md Constitution Check
+
+- [ ] T063 [US4-P7] Add test for message loss prevention during crash
+  - Test: Simulate crash mid-response
+  - Verify: User message persisted before agent invocation (no partial state)
+  - **Spec Reference**: spec-7 US4 Acceptance Scenario 3
+
+---
+
+## Phase 12: US4-MCP - Complete Task Tool (MCP Server)
+
+**User Story**: spec-6 User Story 4 (Priority P2)
+
+**Objective**: MCP tool marks task as completed
+
+**Independent Test**: Create pending task, call complete_task, verify is_completed=true
+
+**Dependencies**: Phase 6-8 complete (MCP foundation)
+
+### Tasks
+
+- [ ] T064 [P] [US4-MCP] Write test for complete_task success in backend/tests/test_mcp_tools.py
+  - Test: test_complete_task_success()
+  - Given: Pending task, When: complete_task called, Then: is_completed=true
+  - **Spec Reference**: spec-6 US4 Acceptance Scenario 1
+
+- [ ] T065 [P] [US4-MCP] Write test for complete_task idempotent in backend/tests/test_mcp_tools.py
+  - Test: test_complete_task_idempotent()
+  - Given: Already completed task, When: complete_task called again, Then: succeeds (no error)
+  - **Spec Reference**: spec-6 US4 Acceptance Scenario 2
+
+- [ ] T066 [P] [US4-MCP] Write test for complete_task not found in backend/tests/test_mcp_tools.py
+  - Test: test_complete_task_not_found()
+  - Given: Task doesn't exist, When: complete_task called, Then: NOT_FOUND error
+  - **Spec Reference**: spec-6 US4 Acceptance Scenario 3
+
+- [ ] T067 [US4-MCP] Implement complete_task MCP tool in backend/src/services/mcp_server.py
+  - Implement: complete_task(task_id, user_id) → Task
+  - Include: Authorization check, idempotent operation, transaction handling
+  - Verify: All tests pass (100% coverage)
+  - **Spec Reference**: spec-6 Tool 4, plan.md MCP Tool Signatures
+
+---
+
+## Phase 13: US5-MCP - Delete Task Tool (MCP Server)
+
+**User Story**: spec-6 User Story 5 (Priority P2)
+
+**Objective**: MCP tool permanently removes task from database
+
+**Independent Test**: Create task, call delete_task, verify task no longer exists
+
+**Dependencies**: Phase 6-8 complete (MCP foundation)
+
+### Tasks
+
+- [ ] T068 [P] [US5-MCP] Write test for delete_task success in backend/tests/test_mcp_tools.py
+  - Test: test_delete_task_success()
+  - Given: Task exists, When: delete_task called, Then: task deleted, success confirmation
+  - **Spec Reference**: spec-6 US5 Acceptance Scenario 1
+
+- [ ] T069 [P] [US5-MCP] Write test for delete_task not found in backend/tests/test_mcp_tools.py
+  - Test: test_delete_task_not_found()
+  - Given: Task doesn't exist, When: delete_task called, Then: NOT_FOUND error
+  - **Spec Reference**: spec-6 US5 Acceptance Scenario 2
+
+- [ ] T070 [P] [US5-MCP] Write test for delete_task wrong user unauthorized in backend/tests/test_mcp_tools.py
+  - Test: test_delete_task_wrong_user()
+  - Given: Task belongs to user A, When: user B deletes, Then: UNAUTHORIZED error
+  - **Spec Reference**: spec-6 Security Requirements
+
+- [ ] T071 [US5-MCP] Implement delete_task MCP tool in backend/src/services/mcp_server.py
+  - Implement: delete_task(task_id, user_id) → Dict (success message)
+  - Include: Authorization check, cascading delete handling, transaction
+  - Verify: All tests pass (100% coverage)
+  - **Spec Reference**: spec-6 Tool 5, plan.md MCP Tool Signatures
+
+---
+
+## Phase 14: US3-Agent - Update Task via Natural Language
+
+**User Story**: spec-5 User Story 3 (Priority P2)
+
+**Objective**: User modifies existing tasks through conversational commands
+
+**Independent Test**: Create task, send "move milk task to tomorrow", verify update persisted
+
+**Dependencies**: Phase 8 complete (update_task MCP tool), Phase 9 complete (agent service)
+
+### Tasks
+
+- [ ] T072 [P] [US3-Agent] Write test for UPDATE intent detection in backend/tests/test_agent_service.py
+  - Test: test_intent_detection_update()
+  - Given: "change milk task to tomorrow", When: agent processes, Then: detects UPDATE intent
+  - **Spec Reference**: spec-5 Intent Detection Rules
+
+- [ ] T073 [P] [US3-Agent] Write test for ambiguous update clarification in backend/tests/test_agent_service.py
+  - Test: test_update_clarification()
+  - Given: "update task" (no task specified), When: agent processes, Then: requests clarification
+  - **Spec Reference**: spec-5 US3 Acceptance Scenario 3
+
+- [ ] T074 [US3-Agent] Implement update task intent handling in backend/src/services/agent_service.py
+  - Enhance: process_message to handle UPDATE intent → update_task tool call
+  - Include: Task identification by title/context, confirmation message
+  - Verify: Tests pass
+  - **Spec Reference**: spec-5 US3, plan.md Agent Behavior Plan
+
+---
+
+## Phase 15: US4-Agent - Delete Task via Natural Language
+
+**User Story**: spec-5 User Story 4 (Priority P2)
+
+**Objective**: User removes tasks they no longer need
+
+**Independent Test**: Create task, send "delete milk task", verify confirmation required, delete persisted
+
+**Dependencies**: Phase 13 complete (delete_task MCP tool), Phase 9 complete (agent service)
+
+### Tasks
+
+- [ ] T075 [P] [US4-Agent] Write test for DELETE intent with confirmation in backend/tests/test_agent_service.py
+  - Test: test_delete_confirmation_required()
+  - Given: "delete milk task", When: agent processes, Then: requests confirmation before calling tool
+  - **Spec Reference**: spec-5 US4 Acceptance Scenario 1
+
+- [ ] T076 [P] [US4-Agent] Write test for DELETE confirmation flow in backend/tests/test_agent_service.py
+  - Test: test_delete_confirmation_flow()
+  - Given: User confirms deletion, When: "yes" received, Then: delete_task tool called
+  - **Spec Reference**: spec-5 US4 Acceptance Scenario 2
+
+- [ ] T077 [US4-Agent] Implement delete task intent handling with confirmation in backend/src/services/agent_service.py
+  - Enhance: process_message to handle DELETE intent → confirmation → delete_task tool call
+  - Include: Destructive operation guard, confirmation tracking
+  - Verify: Tests pass
+  - **Spec Reference**: spec-5 US4, plan.md Agent Behavior Plan
+
+---
+
+## Phase 16: Polish & Integration
+
+**Objective**: Complete integration, add missing tests, validate Phase-II compatibility
+
+**Dependencies**: All user story phases complete
+
+### Tasks
+
+- [ ] T078 [P] Create Chat API endpoint POST /api/v1/chat/message in backend/src/api/v1/chat.py
+  - Implement: Extract user_id from auth, reconstruct context, invoke agent, store messages, return response
+  - Include: Error handling, authentication middleware
+  - Verify: Integration test with agent service
+  - **Spec Reference**: plan.md Chat API, spec-5/6/7 Integration
+
+- [ ] T079 [P] Create Chat API endpoint GET /api/v1/chat/history in backend/src/api/v1/chat.py
+  - Implement: Retrieve messages for user's conversation with pagination
+  - Include: Authorization check (user can only see own history)
+  - Verify: Returns messages in chronological order
+  - **Spec Reference**: plan.md Chat API
+
+- [ ] T080 [P] Write chat API integration tests in backend/tests/test_chat_api.py
+  - Test: POST /chat/message creates task flow
+  - Test: GET /chat/history returns messages
+  - Test: Unauthorized request rejected
+  - **Spec Reference**: plan.md Testing Strategy Section 3
+
+- [ ] T081 [P] Write Phase-II compatibility tests in backend/tests/test_phase_ii_compat.py
+  - Test: POST /api/v1/tasks/ still works
+  - Test: GET /api/v1/tasks/ still works
+  - Test: Phase-II auth endpoints still work
+  - **Spec Reference**: plan.md Testing Strategy Section 6
+
+- [ ] T082 [P] Add agent error handling tests in backend/tests/test_agent_service.py
+  - Test: Database failure → user-friendly error (no internal exposure)
+  - Test: Unparseable date → clarification request
+  - **Spec Reference**: spec-5 Error Handling Specifications
+
+- [ ] T083 [P] Add vivo_all audit logging in backend/src/services/mcp_server.py
+  - Implement: Log all vivo_all operations with admin_user_id, timestamp
+  - Verify: Audit logs written for vivo_all=True calls
+  - **Spec Reference**: plan.md Vivo All Implementation
+
+- [ ] T084 Run full test suite and verify 100% MCP coverage
+  - Execute: pytest backend/tests/ -v --cov=backend/src/services/mcp_server.py --cov-report=term-missing
+  - Verify: 100% coverage for mcp_server.py (constitutional requirement)
+  - **Spec Reference**: plan.md Testing Strategy, Constitution Principle IX
+
+- [ ] T085 Performance validation: Benchmark context reconstruction, MCP operations, agent response time
+  - Execute: Performance tests from plan.md Success Criteria Validation
+  - Verify: Context <500ms, MCP <200ms (95%), Agent response <3s (95%)
+  - **Spec Reference**: plan.md Success Criteria Validation
+
+---
+
+## Validation Checklist
+
+### Constitutional Compliance
+
+- [ ] Principle I: All tasks follow Spec → Plan → Tasks workflow
+- [ ] Principle II: All tasks traceable to spec-5, spec-6, or spec-7
+- [ ] Principle III: Stateless architecture validated (T061-T063)
+- [ ] Principle IV: Tool-only mutations enforced (all agent tasks use MCP tools)
+- [ ] Principle V: Responsibility separation maintained (Agent/MCP/DB boundaries clear)
+- [ ] Principle VI: Phase-II protection validated (T005, T081)
+- [ ] Principle VII: Three separate spec components implemented
+- [ ] Principle VIII: Agent behavior standards tested (T055, T060, T082)
+- [ ] Principle IX: Test-first discipline followed, 100% MCP coverage (T084)
+
+### Phase-II Protection
+
+- [ ] T005: Phase-II test baseline established
+- [ ] T009: Database migration verified (Phase-II tables unchanged)
+- [ ] T013: Schema verification complete
+- [ ] T081: Phase-II compatibility tests passing
+
+### Stateless Architecture
+
+- [ ] T061: Server restart preserves context
+- [ ] T062: No in-memory state detected
+- [ ] T063: No message loss during crash
+
+### MCP Tools (100% Coverage)
+
+- [ ] T084: pytest-cov report shows 100% for mcp_server.py
+- [ ] All MCP tool tests passing (T032-T071)
+- [ ] Authorization checks validated for all tools
+- [ ] Transaction rollback validated (T036)
+
+### Performance
+
+- [ ] T029: Context reconstruction <500ms
+- [ ] T044: MCP operations <200ms (95%)
+- [ ] T085: Agent response <3s (95%)
+
+### Vivo All
+
+- [ ] T041-T042: Vivo all authorization tests passing
+- [ ] T083: Audit logging implemented
+
+---
+
+## Post-Implementation Tasks
+
+### Documentation
+- Create user guide for conversational todo management
+- Document vivo_all admin functionality
+- Update API documentation with new /chat endpoints
+
+### Deployment
+- Apply database migration to production
+- Configure OPENAI_API_KEY in production environment
+- Monitor performance metrics (context reconstruction, MCP latency)
+
+### Future Enhancements (Out of Scope for Phase III)
+- Multiple conversations per user (remove UNIQUE constraint)
+- Voice input/output
+- Multilingual support
+- Task sharing/collaboration
+- Proactive reminders
+
+---
+
+**Status**: ✅ Task List Complete - Ready for `/sp.implement`
+
+**Total Tasks**: 85
+**Parallelizable**: 28 tasks marked with [P]
+**MVP Scope**: Phases 1-10 (54 tasks)
+**Test Coverage**: 100% for MCP tools (constitutional requirement)
+**Phase-II Protection**: Validated via T005, T081
+**Next Command**: `/sp.implement` to execute tasks via Claude Code

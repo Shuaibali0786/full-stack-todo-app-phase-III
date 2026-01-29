@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskFlow AI MCP Tools",
+  "description": "Model Context Protocol tool definitions for TaskFlow AI task management operations",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "create_task",
+      "description": "Creates a new task for the authenticated user with keyword-triggered creation rules",
+      "constitutional_compliance": {
+        "principle_iv": "Tool-Only Mutation Rule - Database write via MCP tool",
+        "principle_v": "Clear Responsibility Separation - Pure data operation, no AI reasoning"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the authenticated user (enforces user isolation)"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Task title (immutable after creation, sanitized for XSS)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "completed"],
+            "default": "pending",
+            "description": "Initial task status (binary: pending or completed)"
+          }
+        },
+        "required": ["user_id", "title"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique task identifier"
+          },
+          "title": {
+            "type": "string",
+            "description": "Task title (sanitized)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "completed"],
+            "description": "Current task status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Task creation timestamp (ISO 8601 UTC)"
+          }
+        },
+        "required": ["id", "title", "status", "created_at"]
+      },
+      "errors": [
+        {
+          "code": "VALIDATION_ERROR",
+          "message": "Title must be 1-500 characters",
+          "condition": "title length invalid"
+        },
+        {
+          "code": "XSS_DETECTED",
+          "message": "Task title contains invalid characters",
+          "condition": "HTML/JS detected in title"
+        },
+        {
+          "code": "DATABASE_ERROR",
+          "message": "Failed to create task",
+          "condition": "Database constraint violation or connection failure"
+        }
+      ]
+    },
+    {
+      "name": "list_tasks",
+      "description": "Lists all tasks for the authenticated user, optionally filtered by status",
+      "constitutional_compliance": {
+        "principle_iii": "Stateless Architecture - Reconstructs state from database",
+        "principle_v": "Clear Responsibility Separation - Pure data retrieval"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the authenticated user (enforces user isolation)"
+          },
+          "status_filter": {
+            "type": "string",
+            "enum": ["all", "pending", "completed"],
+            "default": "all",
+            "description": "Filter tasks by status (all = both pending and completed)"
+          }
+        },
+        "required": ["user_id"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Task identifier"
+            },
+            "title": {
+              "type": "string",
+              "description": "Task title"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "completed"],
+              "description": "Current status"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Creation timestamp"
+            }
+          },
+          "required": ["id", "title", "status", "created_at"]
+        },
+        "description": "Array of tasks ordered by created_at DESC (newest first)"
+      },
+      "errors": [
+        {
+          "code": "UNAUTHORIZED",
+          "message": "Invalid user_id",
+          "condition": "user_id does not exist or unauthorized"
+        },
+        {
+          "code": "DATABASE_ERROR",
+          "message": "Failed to retrieve tasks",
+          "condition": "Database query failure"
+        }
+      ]
+    },
+    {
+      "name": "update_task_status",
+      "description": "Toggles task status between pending and completed (title is immutable)",
+      "constitutional_compliance": {
+        "principle_iv": "Tool-Only Mutation Rule - Database write via MCP tool",
+        "spec_requirement": "FR-009 - Title immutable, status toggle only"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the task to update"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the authenticated user (authorization check)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "completed"],
+            "description": "New status value (toggle between pending and completed)"
+          }
+        },
+        "required": ["task_id", "user_id", "status"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Task identifier"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "completed"],
+            "description": "Updated status"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Update timestamp"
+          }
+        },
+        "required": ["id", "status", "updated_at"]
+      },
+      "errors": [
+        {
+          "code": "NOT_FOUND",
+          "message": "Task not found",
+          "condition": "task_id does not exist"
+        },
+        {
+          "code": "FORBIDDEN",
+          "message": "Cannot update another user's task",
+          "condition": "task.user_id != input.user_id"
+        },
+        {
+          "code": "DATABASE_ERROR",
+          "message": "Failed to update task status",
+          "condition": "Database update failure"
+        }
+      ]
+    },
+    {
+      "name": "delete_task",
+      "description": "Deletes a task by ID with user authorization check",
+      "constitutional_compliance": {
+        "principle_iv": "Tool-Only Mutation Rule - Database write via MCP tool",
+        "spec_requirement": "FR-007 - Deletion by ID or name with disambiguation"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the task to delete"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the authenticated user (authorization check)"
+          }
+        },
+        "required": ["task_id", "user_id"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "True if deletion successful"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable confirmation message"
+          }
+        },
+        "required": ["success", "message"]
+      },
+      "errors": [
+        {
+          "code": "NOT_FOUND",
+          "message": "Task not found",
+          "condition": "task_id does not exist"
+        },
+        {
+          "code": "FORBIDDEN",
+          "message": "Cannot delete another user's task",
+          "condition": "task.user_id != input.user_id"
+        },
+        {
+          "code": "DATABASE_ERROR",
+          "message": "Failed to delete task",
+          "condition": "Database deletion failure"
+        }
+      ]
+    },
+    {
+      "name": "find_tasks_by_name",
+      "description": "Finds tasks matching a search term for deletion disambiguation (fuzzy match, case-insensitive)",
+      "constitutional_compliance": {
+        "principle_iii": "Stateless Architecture - Query-only operation",
+        "spec_requirement": "FR-007 - Fuzzy match with disambiguation"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the authenticated user"
+          },
+          "search_term": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Search term for fuzzy matching (case-insensitive)"
+          }
+        },
+        "required": ["user_id", "search_term"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Task identifier"
+            },
+            "title": {
+              "type": "string",
+              "description": "Task title (for disambiguation)"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "completed"],
+              "description": "Current status"
+            }
+          },
+          "required": ["id", "title", "status"]
+        },
+        "maxItems": 5,
+        "description": "Up to 5 matching tasks for disambiguation (LIMIT 5)"
+      },
+      "errors": [
+        {
+          "code": "VALIDATION_ERROR",
+          "message": "Search term must be 1-200 characters",
+          "condition": "search_term length invalid"
+        },
+        {
+          "code": "DATABASE_ERROR",
+          "message": "Failed to search tasks",
+          "condition": "Database query failure"
+        }
+      ]
+    }
+  ],
+  "authorization_model": {
+    "description": "All MCP tools enforce user isolation via user_id parameter",
+    "rules": [
+      "Every tool receives user_id from authenticated session",
+      "Database queries filtered by user_id = current_user.id",
+      "Cross-user access blocked at tool layer (FORBIDDEN error)",
+      "No global/shared data access"
+    ]
+  },
+  "performance_targets": {
+    "create_task": "<50ms (p95)",
+    "list_tasks": "<10ms (p95) for <100 tasks",
+    "update_task_status": "<30ms (p95)",
+    "delete_task": "<30ms (p95)",
+    "find_tasks_by_name": "<15ms (p95) for fuzzy match"
+  },
+  "testing_requirements": {
+    "unit_tests": "100% coverage for all tools (mocked database)",
+    "integration_tests": "All tools with real database (in-memory SQLite)",
+    "test_scenarios": [
+      "Happy path (valid inputs, successful operations)",
+      "User isolation (cannot access other users' tasks)",
+      "Error handling (NOT_FOUND, FORBIDDEN, DATABASE_ERROR)",
+      "Input validation (XSS, length constraints)",
+      "Edge cases (empty task list, duplicate titles, fuzzy match 0/1/5+ results)"
+    ]
+  }
+}

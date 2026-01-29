@@ -1,0 +1,315 @@
+openapi: 3.0.0
+info:
+  title: TaskFlow AI Chat API
+  version: 1.0.0
+  description: |
+    Natural language interface for task management via AI assistant.
+    Powered by OpenRouter API with Claude 3.5 Sonnet and GPT-4 Turbo models.
+
+    Constitutional Compliance:
+    - Principle III (Stateless Architecture): Context reconstructed from database per request
+    - Principle IV (Tool-Only Mutation): Agent → MCP Tool → Database mutation path
+    - Principle VIII (Agent Behavior Standards): Confirmation, error handling, clarification
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.taskflowai.example.com
+    description: Production server (future)
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/v1/ai/chat:
+    post:
+      summary: Send message to AI assistant
+      description: |
+        Sends a natural language message to TaskFlow AI for task management operations.
+
+        **Intent Detection**:
+        - Keyword matching (fast path): "add", "create", "make", "new task"
+        - LLM classification (fallback): Ambiguous or conversational input
+
+        **Supported Operations**:
+        - CREATE: "add task buy groceries"
+        - LIST: "show tasks", "list all tasks"
+        - UPDATE STATUS: "mark task abc-123 as completed"
+        - DELETE: "delete task buy groceries" (fuzzy match with disambiguation)
+        - CONVERSATIONAL: "hello", "thanks" (no task operation)
+
+        **Performance**:
+        - Keyword path: <1ms
+        - LLM fallback: <3s (p90)
+        - End-to-end: <5s target (SC-001)
+      operationId: sendAIMessage
+      tags:
+        - AI Chat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIMessageRequest'
+            examples:
+              create_task:
+                summary: Create task (keyword trigger)
+                value:
+                  message: "add task buy groceries"
+              list_tasks:
+                summary: List tasks
+                value:
+                  message: "show all my tasks"
+              update_status:
+                summary: Mark task completed
+                value:
+                  message: "mark abc-123 as completed"
+              delete_task:
+                summary: Delete task (fuzzy match)
+                value:
+                  message: "delete buy groceries"
+              conversational:
+                summary: Greeting (no task operation)
+                value:
+                  message: "hello"
+      responses:
+        '200':
+          description: AI assistant response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIMessageResponse'
+              examples:
+                task_created:
+                  summary: Task created successfully
+                  value:
+                    response: "✅ Task created: 'buy groceries' (ID: abc-123, Status: pending)"
+                    actions:
+                      - type: "TASK_CREATED"
+                        task:
+                          id: "abc-123"
+                          title: "buy groceries"
+                          status: "pending"
+                          created_at: "2026-01-27T10:30:00Z"
+                task_listed:
+                  summary: Tasks listed
+                  value:
+                    response: |
+                      You have 2 tasks:
+                      1. buy groceries (ID: abc-123, Status: pending, Created: 10:30 AM)
+                      2. call mom (ID: def-456, Status: completed, Created: 09:15 AM)
+                    actions: []
+                task_updated:
+                  summary: Task status updated
+                  value:
+                    response: "✅ Task marked as completed: 'buy groceries'"
+                    actions:
+                      - type: "TASK_UPDATED"
+                        task:
+                          id: "abc-123"
+                          status: "completed"
+                          updated_at: "2026-01-27T10:35:00Z"
+                task_deleted:
+                  summary: Task deleted
+                  value:
+                    response: "✅ Task deleted: 'buy groceries'"
+                    actions:
+                      - type: "TASK_DELETED"
+                        task_id: "abc-123"
+                disambiguation_needed:
+                  summary: Multiple matches for deletion
+                  value:
+                    response: |
+                      Found 3 tasks matching "meeting":
+                      1. team meeting (ID: aaa-111, Status: pending)
+                      2. client meeting (ID: bbb-222, Status: pending)
+                      3. 1-on-1 meeting (ID: ccc-333, Status: completed)
+
+                      Which task would you like to delete? Reply with the ID (e.g., "delete aaa-111")
+                    actions: []
+                conversational_response:
+                  summary: No task operation
+                  value:
+                    response: "Hello! How can I help you with your tasks today? You can say 'add task [title]' to create a new task."
+                    actions: []
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                empty_message:
+                  summary: Empty message
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Message cannot be empty"
+                message_too_long:
+                  summary: Message exceeds max length
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Message too long (max 2000 characters)"
+        '401':
+          description: Unauthorized (missing or invalid auth token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "UNAUTHORIZED"
+                message: "Authentication token missing or invalid"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "RATE_LIMIT_EXCEEDED"
+                message: "Too many requests. Please try again in 60 seconds."
+        '500':
+          description: Internal server error (OpenRouter API failure or database error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                openrouter_failure:
+                  summary: OpenRouter API down
+                  value:
+                    error: "OPENROUTER_API_ERROR"
+                    message: "AI service temporarily unavailable. Please try again."
+                database_error:
+                  summary: Database connection failure
+                  value:
+                    error: "DATABASE_ERROR"
+                    message: "Unable to save changes. Please try again."
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from Phase II authentication endpoints (/api/v1/auth/login).
+        Must be included in Authorization header: `Authorization: Bearer <token>`
+
+  schemas:
+    AIMessageRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: |
+            User's natural language message for task management.
+            Trigger keywords for task creation: "add", "create", "make", "new task"
+          example: "add task buy groceries"
+
+    AIMessageResponse:
+      type: object
+      required:
+        - response
+      properties:
+        response:
+          type: string
+          description: |
+            AI assistant's natural language response.
+            Includes confirmations, error messages, or conversational replies.
+          example: "✅ Task created: 'buy groceries' (ID: abc-123, Status: pending)"
+        actions:
+          type: array
+          description: |
+            List of task operations performed (for real-time dashboard sync).
+            Empty array for conversational responses or queries.
+          items:
+            $ref: '#/components/schemas/TaskAction'
+          default: []
+
+    TaskAction:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - TASK_CREATED
+            - TASK_UPDATED
+            - TASK_DELETED
+          description: Type of task operation performed
+        task:
+          $ref: '#/components/schemas/Task'
+          description: Task data (for TASK_CREATED and TASK_UPDATED events)
+        task_id:
+          type: string
+          format: uuid
+          description: Task ID (for TASK_DELETED events)
+
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique task identifier
+          example: "abc-123"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Task title (immutable after creation)
+          example: "buy groceries"
+        status:
+          type: string
+          enum:
+            - pending
+            - completed
+          description: Current task status (binary state)
+          example: "pending"
+        created_at:
+          type: string
+          format: date-time
+          description: Task creation timestamp (ISO 8601 UTC)
+          example: "2026-01-27T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp (only for TASK_UPDATED events)
+          example: "2026-01-27T10:35:00Z"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - RATE_LIMIT_EXCEEDED
+            - OPENROUTER_API_ERROR
+            - DATABASE_ERROR
+            - INTERNAL_ERROR
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Message cannot be empty"
+
+tags:
+  - name: AI Chat
+    description: Natural language task management via AI assistant
