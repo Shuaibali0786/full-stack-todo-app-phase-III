@@ -51,6 +51,7 @@ async def get_tags(
 
 
 @router.post("/", response_model=TagResponse)
+@router.post("", response_model=TagResponse)  # Handle both /tags and /tags/
 async def create_tag(
     tag_data: CreateTagRequest,
     current_user: User = Depends(get_current_user),

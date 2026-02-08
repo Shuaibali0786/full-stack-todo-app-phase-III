@@ -51,6 +51,7 @@ async def get_priorities(
 
 
 @router.post("/", response_model=PriorityResponse)
+@router.post("", response_model=PriorityResponse)  # Handle both /priorities and /priorities/
 async def create_priority(
     priority_data: CreatePriorityRequest,
     current_user: User = Depends(get_current_user),

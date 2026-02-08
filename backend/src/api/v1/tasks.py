@@ -161,6 +161,7 @@ async def get_tasks(
 
 
 @router.post("/", response_model=TaskResponse)
+@router.post("", response_model=TaskResponse)  # Handle both /tasks and /tasks/
 async def create_task(
     task_data: CreateTaskRequest,
     current_user: User = Depends(get_current_user),
