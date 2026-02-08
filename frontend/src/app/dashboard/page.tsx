@@ -35,6 +35,9 @@ const DashboardPage: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Real-time SSE connection for task updates
+  // DISABLED: Backend SSE endpoint not implemented yet
+  // TODO: Re-enable when /api/v1/sse/tasks is implemented
+  /*
   useTaskSSE({
     onTaskCreated: (task) => {
       console.log('Task created via SSE:', task);
@@ -55,9 +58,15 @@ const DashboardPage: React.FC = () => {
       console.log('SSE disconnected');
     }
   });
+  */
 
   // Fetch priorities and tags for modals
   const fetchMetadata = useCallback(async () => {
+    // Only fetch if authenticated and not loading
+    if (!isAuthenticated || isLoading) {
+      return;
+    }
+
     try {
       const [prioritiesRes, tagsRes] = await Promise.all([
         priorityApi.getPriorities(),
@@ -69,13 +78,13 @@ const DashboardPage: React.FC = () => {
     } catch (error) {
       console.error('Failed to load priorities and tags:', error);
     }
-  }, []);
+  }, [isAuthenticated, isLoading]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isLoading) {
       fetchMetadata();
     }
-  }, [isAuthenticated, fetchMetadata]);
+  }, [isAuthenticated, isLoading, fetchMetadata]);
 
   // Task modal handlers
   const confirmDelete = async () => {
@@ -226,7 +235,14 @@ const DashboardPage: React.FC = () => {
             {/* AI Chat Section - Takes 1 column on large screens */}
             <div className="lg:col-span-1">
               <div className="sticky top-8 h-[600px]">
-                <ChatKit />
+                <ChatKit onTaskAction={() => {
+                  console.log('[Dashboard] 🔄 Task action received from ChatKit, incrementing refreshTrigger');
+                  setRefreshTrigger((prev) => {
+                    const newTrigger = prev + 1;
+                    console.log(`[Dashboard] ✅ RefreshTrigger updated: ${prev} → ${newTrigger}`);
+                    return newTrigger;
+                  });
+                }} />
               </div>
             </div>
           </motion.div>

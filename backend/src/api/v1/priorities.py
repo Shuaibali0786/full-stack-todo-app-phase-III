@@ -28,6 +28,7 @@ class PriorityResponse(BaseModel):
 
 
 @router.get("/", response_model=List[PriorityResponse])
+@router.get("", response_model=List[PriorityResponse])  # Handle both /priorities and /priorities/
 async def get_priorities(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)

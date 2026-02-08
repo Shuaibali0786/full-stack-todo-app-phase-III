@@ -20,6 +20,7 @@ def create_app() -> FastAPI:
         title="Todo Application API",
         description="API for the Evolution of Todo application",
         version="1.0.0",
+        redirect_slashes=False,  # Prevent query param loss on redirects
     )
 
     # Add CORS middleware - Allow all origins for mobile access
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     )
 
     # Include API routers
+    # Note: Using consistent trailing slash handling with redirect_slashes=False
     app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
     app.include_router(users_router, prefix="/api/v1", tags=["users"])
     app.include_router(tasks_router, prefix="/api/v1/tasks", tags=["tasks"])

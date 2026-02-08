@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Fix - Clear Auth</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4 px 10px rgba(0,0,0,0.3);
+        }
+        h1 { color: #ff6b35; }
+        button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 0;
+            display: block;
+            width: 100%;
+        }
+        button:hover { background: #e55a2b; }
+        .success {
+            background: #28a745;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+        .instructions {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        code {
+            background: #1a1a1a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #ff6b35;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Quick Fix - Clear Authentication</h1>
+
+        <div class="instructions">
+            <h3>Problem:</h3>
+            <p>Your browser has invalid/expired authentication tokens causing 401/422 errors.</p>
+
+            <h3>Solution:</h3>
+            <p>Click the button below to clear all auth tokens and start fresh.</p>
+        </div>
+
+        <button onclick="clearAuth()">🗑️ Clear Authentication Tokens</button>
+
+        <div class="success" id="success">
+            <strong>✅ Success!</strong>
+            <p>Tokens cleared. Now follow these steps:</p>
+            <ol>
+                <li>Go to: <a href="http://localhost:3002" style="color: #4db8ff;">http://localhost:3002</a></li>
+                <li>Click "Sign Up" to create a new account</li>
+                <li>After registration, login with your credentials</li>
+                <li>You should now see the dashboard working!</li>
+            </ol>
+        </div>
+
+        <div class="instructions" style="margin-top: 30px;">
+            <h3>Manual Alternative:</h3>
+            <p>If the button doesn't work, open Browser Console (F12) and run:</p>
+            <code>
+                localStorage.clear(); sessionStorage.clear(); location.reload();
+            </code>
+        </div>
+    </div>
+
+    <script>
+        function clearAuth() {
+            // Clear all authentication tokens
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.clear();
+            sessionStorage.clear();
+
+            // Show success message
+            document.getElementById('success').style.display = 'block';
+
+            // Optional: Auto-redirect after 3 seconds
+            setTimeout(() => {
+                window.location.href = 'http://localhost:3002/auth/login';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

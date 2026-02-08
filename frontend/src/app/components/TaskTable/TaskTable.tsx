@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, AlertCircle } from 'lucide-react';
 import { Task, TaskListResponse } from '@/types';
@@ -26,8 +26,8 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
     order: 'desc',
   });
 
-  // Fetch tasks
-  const fetchTasks = async () => {
+  // Fetch tasks - Memoized to ensure stable reference for useEffect
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -49,7 +49,8 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
         offset: offset.toString(),
       });
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks?${params}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/v1/tasks?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -63,18 +64,21 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
       const data: TaskListResponse = await response.json();
       setTasks(data.tasks);
       setTotalTasks(data.total);
+
+      console.log(`[TaskTable] ✅ Fetched ${data.tasks.length} tasks (trigger: ${refreshTrigger})`);
     } catch (err) {
       console.error('Error fetching tasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, sortConfig.column, sortConfig.order, refreshTrigger]);
 
   // Fetch tasks on mount, when pagination/sort changes, or when refreshTrigger changes
   useEffect(() => {
+    console.log('[TaskTable] 🔄 Refresh triggered:', { currentPage, pageSize, sortConfig, refreshTrigger });
     fetchTasks();
-  }, [currentPage, pageSize, sortConfig, refreshTrigger]);
+  }, [fetchTasks]);
 
   // Handle sort
   const handleSort = (column: SortColumn) => {
@@ -102,8 +106,9 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks/${taskId}/complete?is_completed=${isCompleted}`,
+        `${apiUrl}/api/v1/tasks/${taskId}/complete?is_completed=${isCompleted}`,
         {
           method: 'PATCH',
           headers: {

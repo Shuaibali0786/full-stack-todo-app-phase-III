@@ -35,8 +35,9 @@ export const ViewAllTasksModal: React.FC<ViewAllTasksModalProps> = ({
       }
 
       // Fetch with high limit to get all tasks
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks?limit=1000&sort=created_at&order=desc`,
+        `${apiUrl}/api/v1/tasks/?limit=1000&sort=created_at&order=desc`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

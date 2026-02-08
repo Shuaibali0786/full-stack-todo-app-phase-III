@@ -294,12 +294,18 @@ class MCPTools:
             await session.commit()
             await session.refresh(task)
 
-            return {
+            # Prepare task data for broadcast
+            task_data = {
                 "id": str(task.id),
                 "title": task.title,
                 "is_completed": task.is_completed,
                 "updated_at": task.updated_at.isoformat()
             }
+
+            # Broadcast SSE event for real-time dashboard sync
+            await broadcast_task_event(user_id, "TASK_COMPLETED", task_data)
+
+            return task_data
 
         except MCPToolError:
             await session.rollback()
@@ -355,9 +361,19 @@ class MCPTools:
                     details={"task_id": str(task_id), "user_id": str(user_id)}
                 )
 
+            # Store task data before deletion for broadcast
+            task_data = {
+                "id": str(task.id),
+                "title": task.title,
+                "deleted": True
+            }
+
             # Delete task
             await session.delete(task)
             await session.commit()
+
+            # Broadcast SSE event for real-time dashboard sync
+            await broadcast_task_event(user_id, "TASK_DELETED", task_data)
 
             return {
                 "deleted": True,
@@ -453,6 +469,98 @@ class MCPTools:
             raise MCPToolError(
                 code="DATABASE_ERROR",
                 message=f"Failed to update task status: {str(e)}",
+                details={"error": str(e)}
+            )
+
+    @staticmethod
+    async def update_task(
+        task_id: UUID,
+        user_id: UUID,
+        session: AsyncSession,
+        title: Optional[str] = None,
+        description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Update task title and/or description.
+
+        Args:
+            task_id: Task UUID (required)
+            user_id: User UUID (required, for authorization)
+            session: Async database session
+            title: New task title (optional)
+            description: New task description (optional)
+
+        Returns:
+            Dict with updated task data
+
+        Raises:
+            MCPToolError: On validation or authorization errors
+        """
+        try:
+            # Get task
+            task = await session.get(Task, task_id)
+            if not task:
+                raise MCPToolError(
+                    code="TASK_NOT_FOUND",
+                    message=f"Task with ID {task_id} does not exist",
+                    details={"task_id": str(task_id)}
+                )
+
+            # Verify ownership
+            if task.user_id != user_id:
+                raise MCPToolError(
+                    code="UNAUTHORIZED",
+                    message="Task does not belong to user",
+                    details={"task_id": str(task_id), "user_id": str(user_id)}
+                )
+
+            # Update fields if provided
+            if title is not None:
+                if not title or len(title) > 255:
+                    raise MCPToolError(
+                        code="INVALID_INPUT",
+                        message="Title must be between 1 and 255 characters",
+                        details={"title_length": len(title) if title else 0}
+                    )
+                task.title = title
+
+            if description is not None:
+                if len(description) > 5000:
+                    raise MCPToolError(
+                        code="INVALID_INPUT",
+                        message="Description must be max 5000 characters",
+                        details={"description_length": len(description)}
+                    )
+                task.description = description
+
+            task.updated_at = datetime.utcnow()
+
+            session.add(task)
+            await session.commit()
+            await session.refresh(task)
+
+            # Prepare task data for return
+            task_data = {
+                "id": str(task.id),
+                "title": task.title,
+                "description": task.description,
+                "is_completed": task.is_completed,
+                "updated_at": task.updated_at.isoformat()
+            }
+
+            # Broadcast SSE event for real-time dashboard sync
+            await broadcast_task_event(user_id, "TASK_UPDATED", task_data)
+
+            return task_data
+
+        except MCPToolError:
+            await session.rollback()
+            raise
+        except Exception as e:
+            await session.rollback()
+            raise MCPToolError(
+                code="DATABASE_ERROR",
+                message=f"Failed to update task: {str(e)}",
                 details={"error": str(e)}
             )
 

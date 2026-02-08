@@ -13,7 +13,11 @@ interface Message {
   timestamp: Date;
 }
 
-export const ChatKit: React.FC = () => {
+interface ChatKitProps {
+  onTaskAction?: () => void; // Callback when task is created/updated/deleted
+}
+
+export const ChatKit: React.FC<ChatKitProps> = ({ onTaskAction }) => {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     role: 'agent',
@@ -71,6 +75,21 @@ export const ChatKit: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, agentMessage]);
+
+      // If chatbot performed any actions (task created/updated/deleted), trigger dashboard refresh
+      if (response.data.actions && response.data.actions.length > 0) {
+        console.log('[ChatKit] ✅ Task action detected, refreshing dashboard...', response.data.actions);
+
+        // CRITICAL: Trigger dashboard refresh IMMEDIATELY after action
+        if (onTaskAction) {
+          onTaskAction();
+          console.log('[ChatKit] 🔄 Dashboard refresh callback triggered');
+        } else {
+          console.warn('[ChatKit] ⚠️ No onTaskAction callback provided!');
+        }
+      } else {
+        console.log('[ChatKit] ℹ️ No task actions in response');
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
 

@@ -95,3 +95,10 @@ frontend/node_modules/
 # Docker
 .dockerignore
 !docker/
+# Windows reserved names
+nul
+con
+prn
+aux
+com1
+lpt1

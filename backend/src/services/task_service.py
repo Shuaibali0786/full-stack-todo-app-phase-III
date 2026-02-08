@@ -62,6 +62,33 @@ class TaskService:
         return result.first()
 
     @staticmethod
+    async def count_tasks_for_user(
+        session: AsyncSession,
+        user_id: UUID,
+        completed: Optional[bool] = None,
+        priority_id: Optional[UUID] = None,
+        tag_id: Optional[UUID] = None
+    ) -> int:
+        """
+        Count total tasks for a user with optional filters (no pagination)
+        """
+        from sqlmodel import func
+
+        statement = select(func.count(Task.id)).where(Task.user_id == user_id)
+
+        # Apply same filters as get_tasks_for_user
+        if completed is not None:
+            statement = statement.where(Task.is_completed == completed)
+        if priority_id is not None:
+            statement = statement.where(Task.priority_id == priority_id)
+        if tag_id is not None:
+            # Join with TaskTag to filter by tag
+            statement = statement.join(TaskTag).where(TaskTag.tag_id == tag_id)
+
+        result = await session.exec(statement)
+        return result.one()
+
+    @staticmethod
     async def get_tasks_for_user(
         session: AsyncSession,
         user_id: UUID,

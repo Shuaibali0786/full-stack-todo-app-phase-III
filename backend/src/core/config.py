@@ -6,8 +6,9 @@ class Settings(BaseSettings):
     """
     Application settings loaded from environment variables
     """
-    # Database
-    DATABASE_URL: str = "sqlite:///./todo_app.db"
+    # Database - Neon PostgreSQL
+    # Note: For asyncpg, don't use ?sslmode=require in URL. Use connect_args instead.
+    DATABASE_URL: str = "postgresql+asyncpg://neondb_owner:npg_Q2CPSxjXH1ue@ep-steep-union-ai8qcccs-pooler.c-4.us-east-1.aws.neon.tech/neondb"
     SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15

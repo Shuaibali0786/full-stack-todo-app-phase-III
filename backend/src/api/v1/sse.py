@@ -23,7 +23,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from src.models.user import User
-from src.api.deps import get_current_user
+from src.api.deps import get_current_user_sse
 from src.core.database import get_session
 
 
@@ -137,7 +137,7 @@ async def event_generator(
 @router.get("/tasks")
 async def task_events(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sse),
     session: AsyncSession = Depends(get_session)
 ):
     """

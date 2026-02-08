@@ -13,26 +13,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Check if user is already logged in on component mount
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      // Verify token and fetch user data
-      fetchUserData();
-    } else {
-      setIsLoading(false);
-    }
+    const checkAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        // Verify token and fetch user data
+        await fetchUserData();
+      } else {
+        setIsLoading(false);
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuth();
   }, []);
 
   const fetchUserData = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setIsLoading(false);
+      setIsAuthenticated(false);
+      return;
+    }
+
     try {
       const response = await userApi.getProfile();
       setUser(response.data);
       setIsAuthenticated(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch user data:', error);
-      // If token is invalid, remove it
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      setIsAuthenticated(false);
+      // Only clear tokens if we get an auth error (401)
+      // Don't clear on network errors or other issues
+      if (error?.response?.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        setUser(null);
+        setIsAuthenticated(false);
+      }
     } finally {
       setIsLoading(false);
     }

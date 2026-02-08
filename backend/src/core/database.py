@@ -4,54 +4,40 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import create_engine as sync_create_engine
 from .config import settings
 from typing import AsyncGenerator
-import os
 
 
-# Create both sync and async engines for SQLite
-if settings.DATABASE_URL.startswith("sqlite"):
-    # For SQLite, we need to use a file path and ensure the directory exists
-    db_path = settings.DATABASE_URL.replace("sqlite:///", "")
-    db_dir = os.path.dirname(db_path)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
+# SSL configuration for Neon PostgreSQL
+# Note: psycopg2 (sync) uses "sslmode", asyncpg (async) uses "ssl" as boolean or SSLContext
+sync_ssl_args = {
+    "sslmode": "require"
+}
 
-    # Sync engine for operations like table creation and inspection
-    sync_engine = sync_create_engine(
-        settings.DATABASE_URL,
-        echo=False,  # Set to True for SQL query logging
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
-        connect_args={"check_same_thread": False}  # Needed for SQLite
-    )
+# For asyncpg, ssl=True enables SSL with default verification
+# Neon requires SSL, so we set ssl=True
+async_ssl_args = {
+    "ssl": True
+}
 
-    # Async engine for async operations in the app - USE THE PROPER ASYNC DRIVER
-    async_engine = create_async_engine(
-        settings.DATABASE_URL.replace("sqlite:///", "sqlite+aiosqlite:///"),
-        echo=False,  # Set to True for SQL query logging
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
-        connect_args={"check_same_thread": False}  # Needed for SQLite
-    )
-else:
-    # Sync engine
-    sync_engine = sync_create_engine(
-        settings.DATABASE_URL,
-        echo=False,  # Set to True for SQL query logging
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20
-    )
-    # Async engine
-    async_engine = create_async_engine(
-        settings.DATABASE_URL,
-        echo=False,  # Set to True for SQL query logging
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20
-    )
+# Create sync engine for table creation (uses psycopg2)
+sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+sync_engine = sync_create_engine(
+    sync_url,
+    echo=False,  # Set to True for SQL query logging
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+    connect_args=sync_ssl_args
+)
 
+# Create async engine for async operations (uses asyncpg)
+async_engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,  # Set to False to reduce log noise
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+    connect_args=async_ssl_args
+)
 
 # Use the async engine as the main engine for the app
 engine = async_engine

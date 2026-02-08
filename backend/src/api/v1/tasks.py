@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.models.task import Task, TaskBase
 from src.models.user import User
@@ -88,41 +88,50 @@ class TaskListResponse(BaseModel):
 
 
 @router.get("/", response_model=TaskListResponse)
+@router.get("", response_model=TaskListResponse)  # Handle both /tasks and /tasks/
 async def get_tasks(
-    completed: Optional[bool] = None,
-    priority: Optional[str] = None,
-    tag: Optional[str] = None,
-    sort: Optional[str] = "created_at",
-    order: Optional[str] = "desc",
-    limit: Optional[int] = 50,
-    offset: Optional[int] = 0,
+    completed: Optional[bool] = Query(None, description="Filter by completion status"),
+    priority: Optional[str] = Query(None, description="Filter by priority UUID"),
+    tag: Optional[str] = Query(None, description="Filter by tag UUID"),
+    sort: str = Query("created_at", description="Sort field"),
+    order: str = Query("desc", description="Sort order (asc/desc)"),
+    limit: int = Query(25, ge=1, le=100, description="Max results per page"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
     """
     Get all tasks for the current user
+
+    Query parameters are all optional with safe defaults.
+    Returns paginated list of tasks with filtering and sorting support.
     """
     # Convert string IDs to UUIDs if provided
+    # Gracefully handle invalid UUIDs by ignoring them instead of throwing 422
     priority_uuid = None
     if priority:
         try:
             priority_uuid = UUID(priority)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid priority ID format"
-            )
+        except (ValueError, AttributeError):
+            # Invalid UUID format - ignore and continue without filter
+            print(f"[TASKS API] Invalid priority UUID format: {priority} - ignoring")
+            priority_uuid = None
 
     tag_uuid = None
     if tag:
         try:
             tag_uuid = UUID(tag)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid tag ID format"
-            )
+        except (ValueError, AttributeError):
+            # Invalid UUID format - ignore and continue without filter
+            print(f"[TASKS API] Invalid tag UUID format: {tag} - ignoring")
+            tag_uuid = None
 
+    # Get total count with same filters (for pagination)
+    total_count = await TaskService.count_tasks_for_user(
+        session, current_user.id, completed, priority_uuid, tag_uuid
+    )
+
+    # Get paginated tasks
     tasks = await TaskService.get_tasks_for_user(
         session, current_user.id, completed, priority_uuid, tag_uuid, sort, order, limit, offset
     )
@@ -142,11 +151,10 @@ async def get_tasks(
         for task in tasks
     ]
 
-    # For simplicity, we're returning the list without total count
-    # In a real implementation, you'd want to calculate the total count
+    # Return correct total count for pagination
     return TaskListResponse(
         tasks=task_responses,
-        total=len(task_responses),  # This should be the total count with filters applied
+        total=total_count,  # Total count of all tasks matching filters
         offset=offset,
         limit=limit
     )
@@ -284,12 +292,15 @@ async def delete_task(
 @router.patch("/{task_id}/complete")
 async def toggle_task_completion(
     task_id: UUID,
-    is_completed: bool,
+    is_completed: bool = Query(..., description="Completion status"),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
     """
     Toggle the completion status of a task
+
+    Query Parameters:
+    - is_completed: Boolean indicating whether the task should be marked as completed
     """
     task = await TaskService.toggle_task_completion(session, task_id, current_user.id, is_completed)
     if not task:

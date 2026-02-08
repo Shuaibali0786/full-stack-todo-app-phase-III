@@ -59,10 +59,12 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // If refresh fails, redirect to login
+        // If refresh fails, clear tokens and redirect to login (only if not already on login page)
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
-        window.location.href = '/auth/login';
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth/login')) {
+          window.location.href = '/auth/login';
+        }
         return Promise.reject(refreshError);
       }
     }
@@ -119,7 +121,7 @@ export const taskApi = {
     apiClient.delete(`/api/v1/tasks/${taskId}`),
 
   toggleTaskComplete: (taskId: string, isCompleted: boolean) =>
-    apiClient.patch(`/api/v1/tasks/${taskId}/complete`, { is_completed: isCompleted }),
+    apiClient.patch(`/api/v1/tasks/${taskId}/complete?is_completed=${isCompleted}`),
 };
 
 export const priorityApi = {

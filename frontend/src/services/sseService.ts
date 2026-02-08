@@ -10,8 +10,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-// Polyfill for older browsers
-import 'eventsource-polyfill';
+// Polyfill for older browsers (only on client-side)
+if (typeof window !== 'undefined') {
+  import('eventsource-polyfill');
+}
 
 /**
  * Task event types per contracts/websocket.yaml
@@ -95,13 +97,19 @@ export function useTaskSSE(
    * Connect to SSE endpoint
    */
   const connect = () => {
+    // Only run on client-side
+    if (typeof window === 'undefined') {
+      console.warn('[SSE] Cannot connect during SSR');
+      return;
+    }
+
     // Cleanup existing connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
 
     // Get auth token from localStorage
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     if (!token) {
       console.error('[SSE] No auth token found');
       setStatus('error');
@@ -180,11 +188,23 @@ export function useTaskSSE(
       // Connection error
       eventSource.onerror = (error) => {
         console.error('[SSE] Connection error:', error);
+
+        // Check if this is a 404 (endpoint not found) - don't retry
+        const errorTarget = error.target as EventSource;
+        if (errorTarget?.readyState === EventSource.CLOSED) {
+          console.warn('[SSE] Connection closed (likely 404 - endpoint not implemented). Not retrying.');
+          setStatus('disconnected');
+          handlers.onError?.(error);
+          handlers.onDisconnected?.();
+          eventSource.close();
+          return;
+        }
+
         setStatus('error');
         handlers.onError?.(error);
         handlers.onDisconnected?.();
 
-        // Auto-reconnect with exponential backoff
+        // Auto-reconnect with exponential backoff (only for network errors, not 404)
         if (reconnectAttemptsRef.current < 5) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
           console.log(`[SSE] Reconnecting in ${delay}ms... (attempt ${reconnectAttemptsRef.current + 1}/5)`);

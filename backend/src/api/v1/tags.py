@@ -28,6 +28,7 @@ class TagResponse(BaseModel):
 
 
 @router.get("/", response_model=List[TagResponse])
+@router.get("", response_model=List[TagResponse])  # Handle both /tags and /tags/
 async def get_tags(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
