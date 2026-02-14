@@ -55,28 +55,39 @@ export default function TableRow({ task, onToggleComplete, onEdit, onDelete }: T
     );
   };
 
-  // Due date formatting and styling
+  // Due date formatting and styling — falls back to created_at when no due_date
   const getDueDateDisplay = () => {
-    if (!task.due_date) {
-      return <span className="text-gray-500 text-sm">No due date</span>;
+    if (task.due_date) {
+      try {
+        const dueDate = parseISO(task.due_date);
+        const isOverdue = !task.is_completed && isPast(dueDate);
+        const formattedDate = format(dueDate, 'MMM d, yyyy');
+        return (
+          <div className="flex items-center gap-2">
+            <Calendar className={`w-4 h-4 ${isOverdue ? 'text-red-400' : 'text-gray-400'}`} />
+            <span className={`text-sm ${isOverdue ? 'text-red-400 font-medium' : 'text-gray-300'}`}>
+              {formattedDate}
+              {isOverdue && <span className="ml-1 text-xs">(Overdue)</span>}
+            </span>
+          </div>
+        );
+      } catch {
+        return <span className="text-gray-500 text-sm">Invalid date</span>;
+      }
     }
 
+    // No due_date — show created_at with time
     try {
-      const dueDate = parseISO(task.due_date);
-      const isOverdue = !task.is_completed && isPast(dueDate);
-      const formattedDate = format(dueDate, 'MMM d, yyyy');
-
+      const createdDate = parseISO(task.created_at);
+      const formattedCreated = format(createdDate, 'MMM d, h:mm a');
       return (
         <div className="flex items-center gap-2">
-          <Calendar className={`w-4 h-4 ${isOverdue ? 'text-red-400' : 'text-gray-400'}`} />
-          <span className={`text-sm ${isOverdue ? 'text-red-400 font-medium' : 'text-gray-300'}`}>
-            {formattedDate}
-            {isOverdue && <span className="ml-1 text-xs">(Overdue)</span>}
-          </span>
+          <Calendar className="w-4 h-4 text-gray-500" />
+          <span className="text-sm text-gray-500">{formattedCreated}</span>
         </div>
       );
-    } catch (error) {
-      return <span className="text-gray-500 text-sm">Invalid date</span>;
+    } catch {
+      return <span className="text-gray-500 text-sm">—</span>;
     }
   };
 
