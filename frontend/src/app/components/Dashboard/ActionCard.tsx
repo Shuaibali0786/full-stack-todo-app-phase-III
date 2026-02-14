@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/cn';
-import { fadeInUp, cardHoverScale } from '@/lib/animations';
+import { fadeInUp } from '@/lib/animations';
 
 interface ActionCardProps {
   title: string;
@@ -70,7 +70,8 @@ export function ActionCard({
       variants={fadeInUp}
       initial="initial"
       animate="animate"
-      whileHover={cardHoverScale}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       transition={{ delay: index * 0.1 }}
       onClick={handleClick}
       className={cn(

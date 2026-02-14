@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/cn';
-import { fadeInUp, cardHoverScale } from '@/lib/animations';
+import { fadeInUp } from '@/lib/animations';
 
 interface CardProps {
   children: React.ReactNode;
@@ -35,7 +35,8 @@ export function Card({
     initial: animated ? 'initial' : undefined,
     animate: animated ? 'animate' : undefined,
     exit: animated ? 'exit' : undefined,
-    whileHover: hoverable ? cardHoverScale : undefined,
+    whileHover: hoverable ? { scale: 1.02 } : undefined,
+    whileTap: hoverable ? { scale: 0.98 } : undefined,
   } : {};
 
   return (

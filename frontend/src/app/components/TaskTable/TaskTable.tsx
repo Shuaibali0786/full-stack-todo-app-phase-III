@@ -49,8 +49,7 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
         offset: offset.toString(),
       });
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/v1/tasks?${params}`, {
+      const response = await fetch(`http://localhost:8000/api/v1/tasks?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -106,9 +105,8 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(
-        `${apiUrl}/api/v1/tasks/${taskId}/complete?is_completed=${isCompleted}`,
+        `http://localhost:8000/api/v1/tasks/${taskId}/complete?is_completed=${isCompleted}`,
         {
           method: 'PATCH',
           headers: {

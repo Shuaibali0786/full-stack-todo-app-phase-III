@@ -4,7 +4,7 @@ import React from 'react';
 import { motion, useTransform } from 'framer-motion';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { fadeInUp, cardHoverScale } from '@/lib/animations';
+import { fadeInUp } from '@/lib/animations';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 
 interface StatCardProps {
@@ -80,7 +80,8 @@ export function StatCard({
       variants={fadeInUp}
       initial="initial"
       animate="animate"
-      whileHover={cardHoverScale}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       transition={{ delay: index * 0.1 }}
       onClick={onClick}
       className={cn(

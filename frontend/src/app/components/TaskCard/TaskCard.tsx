@@ -6,7 +6,7 @@ import { Edit2, Trash2, Calendar, Check } from 'lucide-react';
 import { Task } from '@/types';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/app/components/ui/Badge';
-import { fadeInUp, cardHoverScale, checkAnimation } from '@/lib/animations';
+import { fadeInUp } from '@/lib/animations';
 import { isTaskOverdue } from '@/hooks/useTaskStats';
 
 interface TaskCardProps {
@@ -52,13 +52,16 @@ export function TaskCard({
     onDelete(task.id);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string, includeTime = false) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    const dateStr = date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
     });
+    if (!includeTime) return dateStr;
+    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${dateStr} ${timeStr}`;
   };
 
   const getPriorityColor = () => {
@@ -73,7 +76,8 @@ export function TaskCard({
       initial={animated ? 'initial' : undefined}
       animate={animated ? 'animate' : undefined}
       exit={animated ? 'exit' : undefined}
-      whileHover={cardHoverScale}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       transition={{ delay: index * 0.05 }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -99,10 +103,10 @@ export function TaskCard({
           <AnimatePresence mode="wait">
             {task.is_completed && (
               <motion.div
-                variants={checkAnimation}
-                initial="initial"
-                animate="animate"
-                exit="exit"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
               >
                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
               </motion.div>
@@ -139,8 +143,8 @@ export function TaskCard({
           {/* Meta row: Due date and tags */}
           <div className="mt-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Due date */}
-              {task.due_date && (
+              {/* Due date — fall back to created_at if no due_date */}
+              {(task.due_date || task.created_at) && (
                 <span
                   className={cn(
                     'flex items-center gap-1.5 text-xs',
@@ -148,7 +152,9 @@ export function TaskCard({
                   )}
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  {formatDate(task.due_date)}
+                  {task.due_date
+                    ? formatDate(task.due_date)
+                    : formatDate(task.created_at, true)}
                 </span>
               )}
 
