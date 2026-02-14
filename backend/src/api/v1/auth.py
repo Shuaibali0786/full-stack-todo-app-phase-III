@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from src.models.user import User, UserBase
 from src.services.auth_service import AuthService
 from src.api.deps import get_current_user
@@ -98,19 +98,25 @@ async def register(register_request: RegisterRequest, session: AsyncSession = De
         }
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except IntegrityError as e:
+        # DB-level unique constraint violation (race condition on duplicate email)
+        logger.error(f"Integrity error during registration: {str(e)}")
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
     except SQLAlchemyError as e:
-        # Per spec clarification (2026-01-17): Return generic 500 error on DB failures
-        # Log actual error server-side for debugging, don't expose to client
         logger.error(f"Database error during registration: {str(e)}")
+        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error"
         )
     except Exception as e:
-        # Catch any other unexpected errors
         logger.error(f"Unexpected error during registration: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

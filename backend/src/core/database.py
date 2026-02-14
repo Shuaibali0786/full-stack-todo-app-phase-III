@@ -18,8 +18,11 @@ async_ssl_args = {
     "ssl": True
 }
 
+# Strip ?sslmode=require from URL — asyncpg rejects it; SSL is handled via connect_args
+_clean_async_url = settings.DATABASE_URL.split("?")[0]
+
 # Create sync engine for table creation (uses psycopg2)
-sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+sync_url = _clean_async_url.replace("postgresql+asyncpg://", "postgresql://") + "?sslmode=require"
 sync_engine = sync_create_engine(
     sync_url,
     echo=False,  # Set to True for SQL query logging
@@ -31,7 +34,7 @@ sync_engine = sync_create_engine(
 
 # Create async engine for async operations (uses asyncpg)
 async_engine = create_async_engine(
-    settings.DATABASE_URL,
+    _clean_async_url,
     echo=False,  # Set to False to reduce log noise
     pool_pre_ping=True,
     pool_size=10,

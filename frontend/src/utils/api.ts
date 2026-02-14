@@ -1,8 +1,10 @@
 import axios, { AxiosInstance } from 'axios';
 
+const API_BASE_URL = "http://localhost:8000";
+
 // Create an axios instance with default configuration
 const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  baseURL: API_BASE_URL,
   timeout: 30000, // Increased timeout to 30 seconds to prevent premature timeouts
   headers: {
     'Content-Type': 'application/json',
@@ -43,7 +45,7 @@ apiClient.interceptors.response.use(
         }
 
         // Call refresh endpoint
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/refresh`, {
+        const response = await axios.post(`${API_BASE_URL}/api/v1/refresh`, {
           refresh_token: refreshToken
         });
 

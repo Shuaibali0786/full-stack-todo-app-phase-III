@@ -23,10 +23,10 @@ def create_app() -> FastAPI:
         redirect_slashes=False,  # Prevent query param loss on redirects
     )
 
-    # Add CORS middleware - Allow all origins for mobile access
+    # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Allow all origins for mobile access
+        allow_origins=["http://localhost:3000"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
