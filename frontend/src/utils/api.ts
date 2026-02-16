@@ -144,5 +144,5 @@ export const tagApi = {
 
 export const aiApi = {
   sendMessage: (messageData: any) =>
-    apiClient.post('/api/v1/chat/', messageData),
+    apiClient.post('/api/v1/chat', messageData),
 };
