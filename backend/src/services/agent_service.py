@@ -88,13 +88,6 @@ class AgentService:
             print(f"[AGENT SERVICE] Processing message for user_id: {user_id}")
             print(f"[AGENT SERVICE] Message: {message}")
 
-            # Check if chat service is available
-            if not self.is_available or not self.client:
-                return {
-                    "response": "Chat service is currently unavailable. Please configure OPENAI_API_KEY in backend/.env to enable AI chat features.",
-                    "actions": []
-                }
-
             # Step 1: Get or create conversation
             conversation = await ConversationService.get_or_create_conversation(
                 user_id=user_id,
@@ -582,12 +575,14 @@ Type 'help' for more info!"""
         print(f"[INTENT DETECTION] Processing: '{message_lower}'")
 
         # HELP intent - CHECK FIRST (for assistance requests)
+        # Use word-boundary check to avoid matching "how" inside "show", etc.
+        import re
         help_patterns = [
-            "help", "how", "what can you do", "what do you do",
-            "how does this work", "how to", "guide", "instructions",
-            "what is this", "explain", "capabilities", "what are you"
+            r"\bhelp\b", r"\bhow\b", r"what can you do", r"what do you do",
+            r"how does this work", r"how to", r"\bguide\b", r"\binstructions\b",
+            r"what is this", r"\bexplain\b", r"\bcapabilities\b", r"what are you"
         ]
-        if any(pattern in message_lower for pattern in help_patterns):
+        if any(re.search(pattern, message_lower) for pattern in help_patterns):
             print(f"[INTENT] HELP detected")
             return "HELP"
 

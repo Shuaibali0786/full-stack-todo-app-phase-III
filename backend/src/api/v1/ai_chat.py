@@ -20,6 +20,7 @@ class AIMessageResponse(BaseModel):
     actions: Optional[List[Dict[str, Any]]] = []
 
 
+@router.post("/chat/", response_model=AIMessageResponse)
 @router.post("/chat", response_model=AIMessageResponse)
 async def send_ai_message(
     message_data: AIMessageRequest,
