@@ -49,7 +49,7 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
         offset: offset.toString(),
       });
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks?${params}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks/?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -106,7 +106,7 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
       if (!token) return;
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks/${taskId}/complete?is_completed=${isCompleted}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks/${taskId}/complete/?is_completed=${isCompleted}`,
         {
           method: 'PATCH',
           headers: {

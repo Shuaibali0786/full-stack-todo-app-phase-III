@@ -108,38 +108,38 @@ export const userApi = {
 
 export const taskApi = {
   getTasks: (params?: any) =>
-    apiClient.get('/api/v1/tasks', { params }),
+    apiClient.get('/api/v1/tasks/', { params }),
 
   createTask: (taskData: any) =>
-    apiClient.post('/api/v1/tasks', taskData),
+    apiClient.post('/api/v1/tasks/', taskData),
 
   getTask: (taskId: string) =>
-    apiClient.get(`/api/v1/tasks/${taskId}`),
+    apiClient.get(`/api/v1/tasks/${taskId}/`),
 
   updateTask: (taskId: string, taskData: any) =>
-    apiClient.put(`/api/v1/tasks/${taskId}`, taskData),
+    apiClient.put(`/api/v1/tasks/${taskId}/`, taskData),
 
   deleteTask: (taskId: string) =>
-    apiClient.delete(`/api/v1/tasks/${taskId}`),
+    apiClient.delete(`/api/v1/tasks/${taskId}/`),
 
   toggleTaskComplete: (taskId: string, isCompleted: boolean) =>
-    apiClient.patch(`/api/v1/tasks/${taskId}/complete?is_completed=${isCompleted}`),
+    apiClient.patch(`/api/v1/tasks/${taskId}/complete/?is_completed=${isCompleted}`),
 };
 
 export const priorityApi = {
   getPriorities: () =>
-    apiClient.get('/api/v1/priorities'),
+    apiClient.get('/api/v1/priorities/'),
 
   createPriority: (priorityData: any) =>
-    apiClient.post('/api/v1/priorities', priorityData),
+    apiClient.post('/api/v1/priorities/', priorityData),
 };
 
 export const tagApi = {
   getTags: () =>
-    apiClient.get('/api/v1/tags'),
+    apiClient.get('/api/v1/tags/'),
 
   createTag: (tagData: any) =>
-    apiClient.post('/api/v1/tags', tagData),
+    apiClient.post('/api/v1/tags/', tagData),
 };
 
 export const aiApi = {

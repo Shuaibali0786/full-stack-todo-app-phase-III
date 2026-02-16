@@ -123,7 +123,7 @@ export function useTaskSSE(
       // Create EventSource connection
       // Note: EventSource doesn't support custom headers directly
       // We'll need to pass token as query param or use a custom solution
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/sse/tasks?token=${token}`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/sse/tasks/?token=${token}`;
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 
