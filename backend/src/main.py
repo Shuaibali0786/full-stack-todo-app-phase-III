@@ -26,7 +26,14 @@ def create_app() -> FastAPI:
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
+        allow_origins=[
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "https://shuaibali-todo-backend.hf.space",
+            "https://*.vercel.app",
+            "https://*.hf.space",
+        ],
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
