@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 from .user import User
 from .priority import Priority
@@ -27,8 +27,8 @@ class Task(TaskBase, table=True):
     )
     user_id: uuid.UUID = Field(foreign_key="users.id", nullable=False)
     priority_id: Optional[uuid.UUID] = Field(foreign_key="priorities.id", default=None)
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, nullable=False)
+    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, nullable=False)
 
     # Relationships
     user: User = Relationship(back_populates="tasks")

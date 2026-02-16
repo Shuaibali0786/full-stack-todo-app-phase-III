@@ -13,7 +13,7 @@ Per spec-6-mcp-server.md:
 """
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 
@@ -118,8 +118,8 @@ class MCPTools:
                 reminder_time=reminder_time,
                 priority_id=priority_id,
                 is_completed=False,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc)
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
 
             session.add(task)
