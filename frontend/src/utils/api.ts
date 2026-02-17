@@ -114,16 +114,16 @@ export const taskApi = {
     apiClient.post('/api/v1/tasks/', taskData),
 
   getTask: (taskId: string) =>
-    apiClient.get(`/api/v1/tasks/${taskId}/`),
+    apiClient.get(`/api/v1/tasks/${taskId}`),
 
   updateTask: (taskId: string, taskData: any) =>
-    apiClient.put(`/api/v1/tasks/${taskId}/`, taskData),
+    apiClient.put(`/api/v1/tasks/${taskId}`, taskData),
 
   deleteTask: (taskId: string) =>
-    apiClient.delete(`/api/v1/tasks/${taskId}/`),
+    apiClient.delete(`/api/v1/tasks/${taskId}`),
 
   toggleTaskComplete: (taskId: string, isCompleted: boolean) =>
-    apiClient.patch(`/api/v1/tasks/${taskId}/complete/?is_completed=${isCompleted}`),
+    apiClient.patch(`/api/v1/tasks/${taskId}/complete`, { is_completed: isCompleted }),
 };
 
 export const priorityApi = {

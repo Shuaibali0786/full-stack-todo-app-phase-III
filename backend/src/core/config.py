@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """
     # Database - Neon PostgreSQL
     # Note: For asyncpg, don't use ?sslmode=require in URL. Use connect_args instead.
-    DATABASE_URL: str = "postgresql+asyncpg://neondb_owner:npg_Q2CPSxjXH1ue@ep-steep-union-ai8qcccs-pooler.c-4.us-east-1.aws.neon.tech/neondb"
+    DATABASE_URL: str = "postgresql+asyncpg://neondb_owner:npg_B3C4FxcwJYGW@ep-jolly-wind-ainmmnu6-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
     SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15

@@ -106,13 +106,14 @@ export default function TaskTable({ onAddTask, onEditTask, onDeleteTask, onTaskU
       if (!token) return;
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks/${taskId}/complete/?is_completed=${isCompleted}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/tasks/${taskId}/complete`,
         {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ is_completed: isCompleted }),
         }
       );
 
