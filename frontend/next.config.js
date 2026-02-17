@@ -30,11 +30,6 @@ const nextConfig = {
     return config;
   },
 
-  // Experimental features for faster dev experience
-  experimental: {
-    // Optimize package imports for faster compilation
-    optimizePackageImports: ['lucide-react', 'framer-motion'],
-  },
 };
 
 module.exports = nextConfig;
