@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Ensure proper transpilation for dependencies
-  transpilePackages: ['framer-motion', 'lucide-react'],
 
   // Webpack configuration for improved dev performance
   webpack: (config, { dev, isServer }) => {
