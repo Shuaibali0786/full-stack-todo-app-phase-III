@@ -52,24 +52,29 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def startup_event():
         """Create database tables and seed default data on startup"""
-        # Call sync version of create_tables
-        from sqlmodel import SQLModel
-        from src.models.user import User
-        from src.models.task import Task
-        from src.models.priority import Priority
-        from src.models.tag import Tag
-        from src.models.task_tag import TaskTag
-        from src.models.recurring_task import RecurringTask
-        from src.models.task_instance import TaskInstance
-        # Phase III models
-        from src.models.conversation import Conversation
-        from src.models.message import Message
+        try:
+            # Call sync version of create_tables
+            from sqlmodel import SQLModel
+            from src.models.user import User
+            from src.models.task import Task
+            from src.models.priority import Priority
+            from src.models.tag import Tag
+            from src.models.task_tag import TaskTag
+            from src.models.recurring_task import RecurringTask
+            from src.models.task_instance import TaskInstance
+            # Phase III models
+            from src.models.conversation import Conversation
+            from src.models.message import Message
 
-        # Create tables using sync engine
-        SQLModel.metadata.create_all(sync_engine)
+            # Create tables using sync engine
+            SQLModel.metadata.create_all(sync_engine)
 
-        # Seed default data
-        seed_default_data()
+            # Seed default data
+            seed_default_data()
+            print("Startup: DB init and seed completed successfully")
+        except Exception as e:
+            # Log but don't crash — server still starts; DB ops will fail at request time
+            print(f"Startup warning: DB init failed ({e}). Server starting anyway.")
 
     return app
 
