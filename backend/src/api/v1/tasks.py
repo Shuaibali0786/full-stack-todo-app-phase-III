@@ -42,6 +42,10 @@ class CreateTaskRequest(BaseModel):
         return due_date_dt, reminder_time_dt
 
 
+class ToggleRequest(BaseModel):
+    is_completed: bool
+
+
 class UpdateTaskRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -293,17 +297,17 @@ async def delete_task(
 @router.patch("/{task_id}/complete")
 async def toggle_task_completion(
     task_id: UUID,
-    is_completed: bool = Query(..., description="Completion status"),
+    body: ToggleRequest,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
     """
     Toggle the completion status of a task
 
-    Query Parameters:
+    Body Parameters:
     - is_completed: Boolean indicating whether the task should be marked as completed
     """
-    task = await TaskService.toggle_task_completion(session, task_id, current_user.id, is_completed)
+    task = await TaskService.toggle_task_completion(session, task_id, current_user.id, body.is_completed)
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
